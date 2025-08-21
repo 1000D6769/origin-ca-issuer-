@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -27,13 +26,8 @@ import (
 )
 
 func TestCertificateRequestReconcile(t *testing.T) {
-	if err := cmapi.AddToScheme(scheme.Scheme); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := v1.AddToScheme(scheme.Scheme); err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, cmapi.AddToScheme(scheme.Scheme))
+	assert.NilError(t, v1.AddToScheme(scheme.Scheme))
 
 	clock := fakeClock.NewFakeClock(time.Now().Truncate(time.Second))
 	now := metav1.NewTime(clock.Now())
@@ -106,6 +100,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 					},
 				},
 				Certificate: golden.Get(t, "certificate.golden"),
+				CA:          eccCAPEM,
 			},
 			namespaceName: types.NamespacedName{
 				Namespace: "default",
@@ -169,6 +164,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 					},
 				},
 				Certificate: golden.Get(t, "certificate.golden"),
+				CA:          eccCAPEM,
 			},
 			namespaceName: types.NamespacedName{
 				Namespace: "default",
@@ -233,6 +229,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 					},
 				},
 				Certificate: golden.Get(t, "certificate.golden"),
+				CA:          eccCAPEM,
 			},
 			namespaceName: types.NamespacedName{
 				Namespace: "default",
@@ -296,6 +293,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 					},
 				},
 				Certificate: golden.Get(t, "certificate.golden"),
+				CA:          eccCAPEM,
 			},
 			namespaceName: types.NamespacedName{
 				Namespace: "default",
@@ -444,7 +442,6 @@ func TestCertificateRequestReconcile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			client := fake.NewClientBuilder().
 				WithScheme(scheme.Scheme).
@@ -464,7 +461,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 				Builder:                  cfapi.NewBuilder().WithClient(tt.recorder.GetDefaultClient()),
 			}
 
-			_, err := reconcile.AsReconciler(client, controller).Reconcile(context.Background(), reconcile.Request{
+			_, err := reconcile.AsReconciler(client, controller).Reconcile(t.Context(), reconcile.Request{
 				NamespacedName: tt.namespaceName,
 			})
 
@@ -475,7 +472,7 @@ func TestCertificateRequestReconcile(t *testing.T) {
 			}
 
 			got := &cmapi.CertificateRequest{}
-			assert.NilError(t, client.Get(context.TODO(), tt.namespaceName, got))
+			assert.NilError(t, client.Get(t.Context(), tt.namespaceName, got))
 			assert.DeepEqual(t, got.Status, tt.expected)
 		})
 	}
@@ -491,10 +488,9 @@ func RecorderMust(t *testing.T, name string) *recorder.Recorder {
 			return nil
 		}, recorder.BeforeSaveHook),
 		recorder.WithSkipRequestLatency(true),
+		recorder.WithMatcher(cassette.NewDefaultMatcher(cassette.WithIgnoreUserAgent(true))),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NilError(t, err)
 
 	return recorder
 }
